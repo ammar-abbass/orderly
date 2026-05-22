@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+.env
+.env.local
+.git
+.gitignore
+README.md
+docs
+tests
+*.log
+*.md
+.vscode
+.idea
+docker
+k8s
+scripts

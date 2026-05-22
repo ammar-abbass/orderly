@@ -1,0 +1,186 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orderly-dev
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orderly
+  labels:
+    app: orderly
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0 # Zero-downtime deploys
+  selector:
+    matchLabels:
+      app: orderly
+  template:
+    metadata:
+      labels:
+        app: orderly
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: orderly
+          image: orderly:latest
+          imagePullPolicy: IfNotPresent # Critical for local dev
+          ports:
+            - containerPort: 3000
+              name: http
+            - containerPort: 3001
+              name: admin
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: '3000'
+            - name: ADMIN_PORT
+              value: '3001'
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: orderly-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: orderly-secrets
+                  key: redis-url
+            - name: ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: orderly-secrets
+                  key: admin-api-key
+            - name: PAYMENT_GATEWAY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: orderly-secrets
+                  key: payment-gateway-api-key
+          resources:
+            requests:
+              memory: '256Mi'
+              cpu: '250m'
+            limits:
+              memory: '512Mi'
+              cpu: '1000m'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                # Give the load balancer time to stop routing before shutdown
+                command: ['/bin/sh', '-c', 'sleep 15']
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orderly
+  namespace: orderly-dev
+spec:
+  selector:
+    app: orderly
+  ports:
+    - port: 80
+      targetPort: 3000
+      name: http
+    - port: 81
+      targetPort: 3001
+      name: admin
+  type: ClusterIP
+
+
+# ---
+# apiVersion: autoscaling/v2
+# kind: HorizontalPodAutoscaler
+# metadata:
+#   name: orderly-hpa
+# spec:
+#   scaleTargetRef:
+#     apiVersion: apps/v1
+#     kind: Deployment
+#     name: orderly
+#   minReplicas: 3
+#   maxReplicas: 20
+#   metrics:
+#     - type: Resource
+#       resource:
+#         name: cpu
+#         target:
+#           type: Utilization
+#           averageUtilization: 70
+#     - type: Resource
+#       resource:
+#         name: memory
+#         target:
+#           type: Utilization
+#           averageUtilization: 80
+#   behavior:
+#     scaleUp:
+#       stabilizationWindowSeconds: 60
+#       policies:
+#         - type: Percent
+#           value: 100
+#           periodSeconds: 15
+#     scaleDown:
+#       stabilizationWindowSeconds: 300
+#       policies:
+#         - type: Percent
+#           value: 10
+#           periodSeconds: 60
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: orderly-pdb
+  namespace: orderly-dev
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: orderly
+
+# ---
+# # Migration Job — runs before the Deployment rolls out (Helm pre-upgrade hook)
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: orderly-migration
+#   annotations:
+#     'helm.sh/hook': pre-install,pre-upgrade
+#     'helm.sh/hook-weight': '-5'
+#     'helm.sh/hook-delete-policy': hook-succeeded
+# spec:
+#   backoffLimit: 3
+#   template:
+#     spec:
+#       restartPolicy: OnFailure
+#       containers:
+#         - name: migration
+#           image: orderly:latest
+#           command: ['node', 'dist/infrastructure/database/migration-runner.js']
+#           env:
+#             - name: DATABASE_URL
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: orderly-secrets
+#                   key: database-url
