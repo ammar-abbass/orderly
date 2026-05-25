@@ -21,8 +21,6 @@ let app: FastifyInstance | null = null;
 async function buildTestServer(): Promise<FastifyInstance> {
   // Inline composition to mirror src/index.ts without starting the real listeners
   const { getConfig } = await import('../../src/config.js');
-  const { runMigrations } =
-    await import('../../src/infrastructure/database/migration-runner.js');
   const { OrderRepository } =
     await import('../../src/domain/repositories/order-repository.js');
   const { SagaRepository } =
@@ -48,12 +46,12 @@ async function buildTestServer(): Promise<FastifyInstance> {
   const { OrderService } =
     await import('../../src/domain/services/order-service.js');
   const { buildServer } = await import('../../src/api/server.js');
-  const { logger } = await import('../../src/infrastructure/observability/logger.js');
-  const { metrics } = await import('../../src/infrastructure/observability/metrics.js');
+  const { logger } =
+    await import('../../src/infrastructure/observability/logger.js');
+  const { metrics } =
+    await import('../../src/infrastructure/observability/metrics.js');
 
   getConfig(); // Validate config early
-
-  await runMigrations();
 
   const orderRepo = new OrderRepository();
   const sagaRepo = new SagaRepository();
@@ -63,8 +61,18 @@ async function buildTestServer(): Promise<FastifyInstance> {
   const gateway = new StripeAdapter();
   const resilience = createPaymentResiliencePolicy();
   const txManager = new PostgresTransactionManager();
-  const inventoryService = new InventoryService(inventoryRepo, lockManager, logger, metrics);
-  const paymentService = new PaymentService(gateway, resilience, logger, metrics);
+  const inventoryService = new InventoryService(
+    inventoryRepo,
+    lockManager,
+    logger,
+    metrics,
+  );
+  const paymentService = new PaymentService(
+    gateway,
+    resilience,
+    logger,
+    metrics,
+  );
 
   const sagaOrchestrator = new SagaOrchestrator(
     orderRepo,
@@ -110,7 +118,8 @@ async function buildTestServer(): Promise<FastifyInstance> {
     { sku: 'E2E-OOS-001', quantity: 0 },
   ]);
 
-  const { RateLimiter } = await import('../../src/infrastructure/redis/rate-limiter.js');
+  const { RateLimiter } =
+    await import('../../src/infrastructure/redis/rate-limiter.js');
   const rateLimiter = new RateLimiter();
 
   return buildServer({ orderService, sagaOrchestrator, sagaRepo, rateLimiter });

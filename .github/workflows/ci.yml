@@ -129,7 +129,9 @@ jobs:
           REDIS_URL: redis://localhost:6379
           ADMIN_API_KEY: test-admin-key
           NODE_ENV: test
-        run: pnpm run test:integration
+        run: |
+          pnpm run migrate
+          pnpm run test:integration
 
   # ── Security audit ─────────────────────────────────────────────────────────
   security:
@@ -158,7 +160,7 @@ jobs:
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: "fs"
           scan-ref: "."
