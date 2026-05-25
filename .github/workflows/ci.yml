@@ -182,11 +182,12 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
+          context: .
+          file: docker/Dockerfile
+          load: true
+          tags: orderly:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Build Docker image
-
-        run: docker build -f docker/Dockerfile -t orderly:ci .
 
       - name: Verify Docker image starts
         run: |
