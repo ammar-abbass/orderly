@@ -120,5 +120,23 @@ describe('InventoryService', () => {
       expect(result).toBe(true);
       expect(repo.release).toHaveBeenCalledWith('SKU-A', 2);
     });
+
+    it('returns false if lock not acquired', async () => {
+      vi.mocked(lock.acquire).mockResolvedValue(null);
+      const result = await service.releaseInventory('order-1', [{ sku: 'SKU-A', quantity: 2 }]);
+      expect(result).toBe(false);
+    });
+
+    it('releases locks even if repo.release throws error', async () => {
+      const releaseFn = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(lock.acquire).mockResolvedValue(releaseFn);
+      vi.mocked(repo.release).mockRejectedValue(new Error('DB error'));
+
+      await expect(
+        service.releaseInventory('order-1', [{ sku: 'SKU-A', quantity: 2 }])
+      ).rejects.toThrow('DB error');
+
+      expect(releaseFn).toHaveBeenCalled();
+    });
   });
 });

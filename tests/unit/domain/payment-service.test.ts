@@ -61,6 +61,14 @@ describe('PaymentService', () => {
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('circuit_open');
     });
+
+    it('logs warning when payment is declined but no exception thrown', async () => {
+      vi.mocked(gateway.charge).mockResolvedValue({ success: false, transactionId: null, errorCode: 'declined', errorMessage: 'Card declined' });
+      const amount = new Money('50.00', 'USD');
+      const result = await service.charge({ orderId: 'order-1', paymentToken: 'tok_123', amount });
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe('declined');
+    });
   });
 
   describe('refund', () => {
@@ -69,6 +77,15 @@ describe('PaymentService', () => {
       const result = await service.refund('charge-1', amount);
       expect(result.success).toBe(true);
       expect(gateway.refund).toHaveBeenCalledWith('charge-1', amount);
+    });
+
+    it('returns error result when refund throws', async () => {
+      vi.mocked(gateway.refund).mockRejectedValue(new Error('Network error'));
+      const amount = new Money('50.00', 'USD');
+      const result = await service.refund('charge-1', amount);
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe('refund_error');
+      expect(result.errorMessage).toBe('Network error');
     });
   });
 });

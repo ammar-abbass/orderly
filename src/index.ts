@@ -22,7 +22,6 @@
  */
 
 import { getConfig } from './config.js';
-import { runMigrations } from './infrastructure/database/migration-runner.js';
 import { closeDatabase } from './infrastructure/database/connection.js';
 import { closeRedis } from './infrastructure/redis/connection.js';
 import { closeQueueConnection } from './infrastructure/queue/connection.js';
@@ -66,7 +65,7 @@ async function main(): Promise<void> {
   initTracer();
 
   // ── Migrations ─────────────────────────────────────────────────────────
-  await runMigrations();
+  // Migrations are now handled externally via node-pg-migrate before startup
 
   // ── Repositories (singletons) ──────────────────────────────────────────
   const orderRepo      = new OrderRepository();

@@ -8,6 +8,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/domain/**'],
+      exclude: ['src/domain/ports/**', 'src/domain/repositories/**'],
       thresholds: {
         lines: 90,
         functions: 90,

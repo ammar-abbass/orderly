@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: orderly-migration
+  namespace: orderly-dev
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migration
+          image: orderly:latest
+          imagePullPolicy: IfNotPresent
+          command: ['npm', 'run', 'migrate']
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: orderly-secrets
+                  key: database-url
